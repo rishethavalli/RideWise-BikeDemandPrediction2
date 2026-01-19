@@ -9,6 +9,8 @@ import { SeasonParticles } from "@/components/season-particles"
 import { BikeIcon } from "@/components/bike-icon"
 import { BikeLoader } from "@/components/bike-loader"
 import { BackgroundBikes } from "@/components/background-bikes"
+import { WeatherWidget } from "@/components/weather-widget"
+import type { WeatherData } from "@/hooks/use-weather"
 
 type PredictionMode = "daily" | "hourly"
 type Season = "spring" | "summer" | "fall" | "winter"
@@ -47,6 +49,7 @@ export default function PredictPage() {
   const [isHoliday, setIsHoliday] = useState(false)
   const [isWorkingDay, setIsWorkingDay] = useState(true)
   const [prediction, setPrediction] = useState<number | null>(null)
+  const [showWeatherWidget, setShowWeatherWidget] = useState(false)
 
   const [animatedValue, setAnimatedValue] = useState(0)
   const [showExplanation, setShowExplanation] = useState(false)
@@ -236,6 +239,13 @@ export default function PredictPage() {
     localStorage.setItem("ridewise-scenarios", JSON.stringify(updated))
   }
 
+  const handleWeatherChange = (weather: WeatherData) => {
+    setTemperature(weather.temperature)
+    setHumidity(weather.humidity)
+    setWindSpeed(Math.round(weather.windSpeed * 3.6))
+    setWeather(weather.weatherCondition)
+  }
+
   const badges = prediction !== null ? getInsightBadges() : []
   const explanationFactors = prediction !== null ? getExplanationFactors() : []
   const difference =
@@ -266,6 +276,27 @@ export default function PredictPage() {
           <h1 className="mb-8 text-center text-4xl font-bold text-white drop-shadow-[0_0_10px_rgba(0,166,81,0.5)]">
             Predict <span className="text-[#00a651]">Demand</span>
           </h1>
+
+          {/* Weather Widget Toggle */}
+          <div className="mb-6 flex justify-center">
+            <button
+              onClick={() => setShowWeatherWidget(!showWeatherWidget)}
+              className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                showWeatherWidget
+                  ? "bg-[#00a651] text-white shadow-lg"
+                  : "bg-white/20 text-white border border-white/30 hover:bg-white/30"
+              }`}
+            >
+              {showWeatherWidget ? "Hide Weather" : "Show Weather Widget"}
+            </button>
+          </div>
+
+          {/* Weather Widget - Optional */}
+          {showWeatherWidget && (
+            <div className="mb-8">
+              <WeatherWidget onWeatherChange={handleWeatherChange} />
+            </div>
+          )}
 
           <Card className="border-white/10 bg-white/95 shadow-2xl backdrop-blur-xl">
             <CardHeader>

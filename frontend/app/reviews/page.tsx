@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -14,28 +14,70 @@ type Review = {
   rating: number
   text: string
   date: string
+  helpfulCount: number
 }
 
+const STORAGE_KEY = "ridewise-reviews"
+
+const DEFAULT_REVIEWS: Review[] = [
+  {
+    id: 1,
+    name: "Sarah Johnson",
+    rating: 5,
+    text: "RideWise has transformed how we manage our bike fleet. The predictions are incredibly accurate!",
+    date: "2026-01-05",
+    helpfulCount: 14,
+  },
+  {
+    id: 2,
+    name: "Mike Chen",
+    rating: 4,
+    text: "Great tool for urban planning. Helps us optimize bike station placement.",
+    date: "2026-01-04",
+    helpfulCount: 9,
+  },
+]
+
 export default function ReviewsPage() {
-  const [reviews, setReviews] = useState<Review[]>([
-    {
-      id: 1,
-      name: "Sarah Johnson",
-      rating: 5,
-      text: "RideWise has transformed how we manage our bike fleet. The predictions are incredibly accurate!",
-      date: "2026-01-05",
-    },
-    {
-      id: 2,
-      name: "Mike Chen",
-      rating: 4,
-      text: "Great tool for urban planning. Helps us optimize bike station placement.",
-      date: "2026-01-04",
-    },
-  ])
+  const [reviews, setReviews] = useState<Review[]>(DEFAULT_REVIEWS)
   const [name, setName] = useState("")
   const [rating, setRating] = useState(5)
   const [text, setText] = useState("")
+  const [minRating, setMinRating] = useState(0)
+  const [sortBy, setSortBy] = useState<"newest" | "helpful">("newest")
+
+  useEffect(() => {
+    const stored = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null
+    if (!stored) return
+
+    try {
+      const parsed = JSON.parse(stored) as Review[]
+      if (Array.isArray(parsed) && parsed.length) {
+        setReviews(parsed)
+      }
+    } catch (error) {
+      console.error("Failed to parse stored reviews", error)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(reviews))
+  }, [reviews])
+
+  const filteredReviews = useMemo(() => {
+    const base = reviews.filter((review) => review.rating >= minRating)
+    if (sortBy === "helpful") {
+      return [...base].sort((a, b) => b.helpfulCount - a.helpfulCount)
+    }
+    return [...base].sort((a, b) => b.id - a.id)
+  }, [minRating, reviews, sortBy])
+
+  const averageRating = useMemo(() => {
+    if (!reviews.length) return 0
+    const total = reviews.reduce((sum, review) => sum + review.rating, 0)
+    return Number((total / reviews.length).toFixed(1))
+  }, [reviews])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -47,12 +89,19 @@ export default function ReviewsPage() {
       rating,
       text,
       date: new Date().toISOString().split("T")[0],
+      helpfulCount: 0,
     }
 
     setReviews((prev) => [newReview, ...prev])
     setName("")
     setRating(5)
     setText("")
+  }
+
+  const incrementHelpful = (id: number) => {
+    setReviews((prev) =>
+      prev.map((review) => (review.id === id ? { ...review, helpfulCount: review.helpfulCount + 1 } : review))
+    )
   }
 
   return (
@@ -74,6 +123,58 @@ export default function ReviewsPage() {
           <h1 className="mb-8 text-center text-4xl font-bold text-white drop-shadow-[0_0_10px_rgba(0,166,81,0.5)]">
             <span className="text-[#00a651]">Reviews</span>
           </h1>
+
+          <div className="mb-8 grid gap-4 md:grid-cols-3">
+            <Card className="border-white/10 bg-white/95 shadow-2xl backdrop-blur-xl">
+              <CardHeader>
+                <CardTitle className="text-gray-800">Average rating</CardTitle>
+                <CardDescription className="text-gray-600">Across all submitted reviews</CardDescription>
+              </CardHeader>
+              <CardContent className="flex items-center justify-between text-gray-800">
+                <div className="flex items-center gap-2 text-3xl font-bold">
+                  {averageRating.toFixed(1)}
+                  <Star className="size-6 fill-amber-500 text-amber-500" />
+                </div>
+                <span className="text-sm text-gray-600">{reviews.length} review(s)</span>
+              </CardContent>
+            </Card>
+
+            <Card className="border-white/10 bg-white/95 shadow-2xl backdrop-blur-xl">
+              <CardHeader>
+                <CardTitle className="text-gray-800">Rating filter</CardTitle>
+                <CardDescription className="text-gray-600">Show only reviews at or above a rating</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <select
+                  value={minRating}
+                  onChange={(e) => setMinRating(Number(e.target.value))}
+                  className="w-full rounded-lg border border-gray-300 bg-white/90 px-3 py-2 text-gray-800 focus:border-[#00a651] focus:outline-none focus:ring-2 focus:ring-[#00a651]/50"
+                >
+                  <option value={0}>All ratings</option>
+                  <option value={5}>5 stars</option>
+                  <option value={4}>4+ stars</option>
+                  <option value={3}>3+ stars</option>
+                </select>
+              </CardContent>
+            </Card>
+
+            <Card className="border-white/10 bg-white/95 shadow-2xl backdrop-blur-xl">
+              <CardHeader>
+                <CardTitle className="text-gray-800">Sort</CardTitle>
+                <CardDescription className="text-gray-600">Prioritize newest or most helpful</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as "newest" | "helpful")}
+                  className="w-full rounded-lg border border-gray-300 bg-white/90 px-3 py-2 text-gray-800 focus:border-[#00a651] focus:outline-none focus:ring-2 focus:ring-[#00a651]/50"
+                >
+                  <option value="newest">Newest first</option>
+                  <option value="helpful">Most helpful</option>
+                </select>
+              </CardContent>
+            </Card>
+          </div>
 
           {/* Review Form - Updated card styling */}
           <Card className="mb-8 border-white/10 bg-white/95 shadow-2xl backdrop-blur-xl">
@@ -140,7 +241,7 @@ export default function ReviewsPage() {
 
           {/* Reviews List */}
           <div className="space-y-4">
-            {reviews.map((review) => (
+            {filteredReviews.map((review) => (
               <Card
                 key={review.id}
                 className="border-white/10 bg-white/95 shadow-xl backdrop-blur-xl transition-all hover:border-[#00a651]/30 hover:shadow-[0_0_20px_rgba(0,166,81,0.3)]"
@@ -161,6 +262,17 @@ export default function ReviewsPage() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-gray-700">{review.text}</p>
+                  <div className="mt-3 flex items-center gap-2 text-sm text-gray-600">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="border-gray-200 text-gray-800 hover:border-[#00a651]/40 hover:bg-[#00a651]/10"
+                      onClick={() => incrementHelpful(review.id)}
+                    >
+                      Helpful • {review.helpfulCount}
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             ))}
