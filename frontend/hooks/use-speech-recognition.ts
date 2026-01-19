@@ -16,6 +16,7 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
   const [transcript, setTranscript] = useState("")
   const [error, setError] = useState<string | null>(null)
   const recognitionRef = useRef<any>(null)
+  const finalTranscriptRef = useRef("")
   const [isSupported, setIsSupported] = useState(false)
 
   // Initialize Speech Recognition API on client side only
@@ -56,9 +57,10 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
       recognitionRef.current = recognition
 
       // Configuration
-      recognition.continuous = false
+      recognition.continuous = true
       recognition.interimResults = true
       recognition.lang = "en-US"
+      recognition.maxAlternatives = 1
 
       // Event handlers
       recognition.onstart = () => {
@@ -68,28 +70,27 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
       }
 
       recognition.onresult = (event: any) => {
-        let interim = ""
-        let final = ""
+        let interimTranscript = ""
+        let finalTranscript = finalTranscriptRef.current
 
-        for (let i = event.resultIndex; i < event.results.length; i++) {
+        for (let i = 0; i < event.results.length; i++) {
           const transcriptPart = event.results[i][0].transcript
           if (event.results[i].isFinal) {
-            final += transcriptPart + " "
+            finalTranscript += transcriptPart + " "
           } else {
-            interim += transcriptPart
+            interimTranscript += transcriptPart
           }
         }
 
-        // Update transcript: show final results, then interim
-        if (final.trim()) {
-          console.log("✅ Final result:", final.trim())
-          setTranscript((prev) => {
-            const combined = (prev + " " + final).trim()
-            return combined
-          })
-        } else if (interim) {
-          console.log("📝 Interim:", interim)
-          setTranscript(interim)
+        // Update the ref with final results
+        finalTranscriptRef.current = finalTranscript
+
+        // Display: final + interim (interim is temporary visual only)
+        const displayTranscript = (finalTranscript + interimTranscript).trim()
+        setTranscript(displayTranscript)
+
+        if (finalTranscript !== finalTranscriptRef.current) {
+          console.log("✅ Final result accumulated:", finalTranscript.trim())
         }
       }
 
@@ -140,6 +141,7 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
 
   const resetTranscript = useCallback(() => {
     setTranscript("")
+    finalTranscriptRef.current = ""
     setError(null)
   }, [])
 

@@ -15,6 +15,7 @@ export default function LoginPage() {
   const [activeTab, setActiveTab] = useState<"login" | "signup">("login")
   const [name, setName] = useState("") // Added name field for signup
   const [email, setEmail] = useState("")
+  const [phone, setPhone] = useState("") // Added phone field for signup
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [loginError, setLoginError] = useState("")
@@ -49,7 +50,7 @@ export default function LoginPage() {
         return
       }
 
-      const result = signup(name, email, password)
+      const result = signup(name, email, phone, password)
       if (result.success) {
         router.push("/welcome")
       } else {
@@ -152,6 +153,22 @@ export default function LoginPage() {
                 required
               />
             </div>
+
+            {activeTab === "signup" && (
+              <div>
+                <label htmlFor="phone" className="mb-2 block text-sm font-medium text-gray-700">
+                  Phone Number
+                </label>
+                <input
+                  id="phone"
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 bg-white/90 px-4 py-2 text-gray-800 backdrop-blur-sm transition-all placeholder:text-gray-400 focus:border-[#00a651] focus:outline-none focus:ring-2 focus:ring-[#00a651]/50"
+                  placeholder="+1 234 567 8900"
+                />
+              </div>
+            )}
 
             <div>
               <label htmlFor="password" className="mb-2 block text-sm font-medium text-gray-700">

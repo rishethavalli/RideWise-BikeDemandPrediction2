@@ -1,10 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Send, Mic, X } from "lucide-react"
+import { Send, Mic, X, Volume2 } from "lucide-react"
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition"
 
 type Message = {
@@ -21,31 +21,60 @@ export default function AssistantPage() {
   ])
   const [input, setInput] = useState("")
   const { isListening, transcript, error, startListening, stopListening, resetTranscript } = useSpeechRecognition()
+  const lastMessageIndexRef = useRef(0)
+
+  // Text-to-speech function for chatbot messages
+  const speakText = (text: string) => {
+    // Cancel any ongoing speech
+    window.speechSynthesis.cancel()
+
+    // Create new speech utterance
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.rate = 1.0
+    utterance.pitch = 1.0
+    utterance.volume = 1.0
+    
+    // Speak the text
+    window.speechSynthesis.speak(utterance)
+  }
+
+  // Auto-speak new assistant messages
+  useEffect(() => {
+    const lastMessage = messages[messages.length - 1]
+    
+    // Only speak if it's a new assistant message (not initial render)
+    if (
+      lastMessage &&
+      lastMessage.role === "assistant" &&
+      messages.length > lastMessageIndexRef.current
+    ) {
+      // Small delay to ensure message is rendered
+      setTimeout(() => {
+        speakText(lastMessage.content)
+      }, 300)
+    }
+    
+    lastMessageIndexRef.current = messages.length
+  }, [messages])
+
+  // Sync transcript to input field
+  useEffect(() => {
+    if (transcript && !isListening) {
+      // When recording stops, update input with transcript
+      setInput(transcript)
+    }
+  }, [transcript, isListening])
 
   const handleMicClick = () => {
     if (isListening) {
-      // Stop listening and let transcript persist
+      // Stop listening - transcript will auto-populate input via useEffect
       stopListening()
     } else {
-      // Reset previous transcript and start new recording
+      // Start new recording - clear previous transcript
       resetTranscript()
+      setInput("")
       startListening()
     }
-  }
-
-  // Handle voice transcript being added to input when recording stops
-  const handleSendWithVoice = async () => {
-    // If we have transcript but empty input, add transcript to input first
-    if (!input.trim() && transcript.trim()) {
-      setInput(transcript.trim())
-      // Reset transcript for next recording
-      resetTranscript()
-      // Don't send yet, let user review
-      return
-    }
-    
-    // Otherwise send normally
-    handleSend()
   }
 
   const handleSend = async () => {
@@ -120,13 +149,18 @@ export default function AssistantPage() {
                   {messages.map((message, index) => (
                     <div key={index} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
                       <div
-                        className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                        className={`group relative max-w-[80%] rounded-lg px-4 py-2 ${
                           message.role === "user"
                             ? "bg-[#00a651] text-white shadow-lg"
-                            : "border border-gray-200 bg-white text-gray-800"
+                            : "cursor-pointer border border-gray-200 bg-white text-gray-800 hover:border-[#00a651]/50 hover:shadow-md transition-all"
                         }`}
+                        onClick={() => message.role === "assistant" && speakText(message.content)}
+                        title={message.role === "assistant" ? "Click to replay" : undefined}
                       >
                         {message.content}
+                        {message.role === "assistant" && (
+                          <Volume2 className="ml-2 inline-block h-4 w-4 text-[#00a651] opacity-0 group-hover:opacity-100 transition-opacity" />
+                        )}
                       </div>
                     </div>
                   ))}
@@ -183,7 +217,7 @@ export default function AssistantPage() {
                     <Mic className="size-4" />
                   </Button>
                   <Button
-                    onClick={!input.trim() && transcript.trim() ? handleSendWithVoice : handleSend}
+                    onClick={handleSend}
                     className="bg-[#00a651] text-white shadow-lg hover:bg-[#008c45]"
                   >
                     <Send className="size-4" />

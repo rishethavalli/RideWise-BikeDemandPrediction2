@@ -2,6 +2,27 @@ import { NextResponse } from "next/server"
 
 const MODEL = "gemini-2.5-flash" // Correct model confirmed by /v1beta/models endpoint
 
+async function fetchWithRetry(url: string, options: RequestInit, retries = 2, delay = 1000) {
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const response = await fetch(url, options)
+      
+      // If 503 (overloaded) and we have retries left, wait and retry
+      if (response.status === 503 && i < retries) {
+        console.log(`Gemini API overloaded, retrying in ${delay}ms... (${i + 1}/${retries})`)
+        await new Promise(resolve => setTimeout(resolve, delay))
+        continue
+      }
+      
+      return response
+    } catch (error) {
+      if (i === retries) throw error
+      await new Promise(resolve => setTimeout(resolve, delay))
+    }
+  }
+  throw new Error("Max retries reached")
+}
+
 export async function POST(req: Request) {
   try {
     const apiKey = process.env.GEMINI_API_KEY
@@ -29,14 +50,23 @@ export async function POST(req: Request) {
       },
     }
 
-    const resp = await fetch(endpoint, {
+    const resp = await fetchWithRetry(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
-    })
+    }, 2, 1500)
 
     if (!resp.ok) {
       const errText = await resp.text()
+      
+      // Better error messages for common issues
+      if (resp.status === 503) {
+        return NextResponse.json(
+          { error: "Gemini API is currently overloaded. Please try again in a moment." },
+          { status: 503 }
+        )
+      }
+      
       return NextResponse.json(
         { error: `Gemini API error: ${resp.status} ${errText}` },
         { status: 502 }
